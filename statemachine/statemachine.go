@@ -1,9 +1,15 @@
 package statemachine
 
+import (
+	"log"
+	"os"
+)
+
 type Handler func() string
 
 type Machine struct {
 	Handlers map[string]Handler
+	Logger   *log.Logger
 }
 
 type StateMachineError struct {
@@ -16,7 +22,8 @@ func (sme StateMachineError) Error() string {
 
 func NewMachine() Machine {
 	return Machine{
-		map[string]Handler{},
+		Handlers: map[string]Handler{},
+		Logger:   log.New(os.Stdout, "statemachine: ", 0),
 	}
 }
 
@@ -26,10 +33,14 @@ func (machine Machine) AddState(stateName string, handlerFn Handler) {
 
 func (machine Machine) Run() (success bool, error error) {
 	state := "INIT"
+	machine.Logger.Println("Starting in state: INIT")
 	for {
 		if handler, present := machine.Handlers[state]; present {
+			oldstate := state
 			state = handler()
+			machine.Logger.Printf("State transition: %s -> %s\n", oldstate, state)
 			if state == "END" {
+				machine.Logger.Println("Terminating")
 				return true, nil
 			}
 		} else {
