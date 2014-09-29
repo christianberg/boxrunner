@@ -17,7 +17,7 @@ type StateMachineError struct {
 }
 
 func (sme StateMachineError) Error() string {
-	return "statemachine: No handler function registered for state: " + sme.State
+	return "ERROR: No handler function registered for state: " + sme.State
 }
 
 func NewMachine() Machine {
@@ -33,18 +33,20 @@ func (machine Machine) AddState(stateName string, handlerFn Handler) {
 
 func (machine Machine) Run() (success bool, error error) {
 	state := "INIT"
-	machine.Logger.Println("Starting in state: INIT")
+	machine.Logger.Println("INFO: Starting in state: INIT")
 	for {
 		if handler, present := machine.Handlers[state]; present {
 			oldstate := state
 			state = handler()
-			machine.Logger.Printf("State transition: %s -> %s\n", oldstate, state)
+			machine.Logger.Printf("INFO: State transition: %s -> %s\n", oldstate, state)
 			if state == "END" {
-				machine.Logger.Println("Terminating")
+				machine.Logger.Println("INFO: Terminating")
 				return true, nil
 			}
 		} else {
-			return false, StateMachineError{state}
+			err := StateMachineError{state}
+			machine.Logger.Print(err)
+			return false, err
 		}
 	}
 }
