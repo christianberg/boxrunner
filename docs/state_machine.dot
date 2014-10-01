@@ -1,0 +1,49 @@
+digraph g{
+        node [shape=Mrecord]
+        edge [labelfontsize=8]
+        rankdir = LR
+        
+        _INIT [shape=point,width=0.1]
+        DISCOVER [label="<0>DISCOVER |
+                  <1>Don't have lock\nContainer not running |
+                  <2>Have lock\nContainer running\nCorrect version |
+                  <3>Have lock\nContainer running\nWrong version |
+                  <4>Don't have lock\nContainer running |
+                  <5>Have lock\nContainer not running"]
+        COMPETE [label="<0>COMPETE |
+                 <1>Lock taken |
+                 <2>Lock acquired"]
+        SLEEP [label="<0>SLEEP |
+               <1>Lock released"]
+        RUNNING [label="<0>RUNNING |
+                 <1>Container exited |
+                 <2>Version changed |
+                 <3>Lock lost"]
+        
+        _INIT -> INITIALIZE [style=bold]
+        INITIALIZE -> DISCOVER:0 [style=bold]
+        DISCOVER:1 -> COMPETE:0 [style=bold]
+        DISCOVER:2 -> RUNNING:0
+        DISCOVER:3 -> STOP
+        DISCOVER:4 -> STOP
+        DISCOVER:5 -> RELEASE
+        COMPETE:1 -> SLEEP:0
+        COMPETE:2 -> START [style=bold]
+        SLEEP:1 -> COMPETE:0
+        START -> RUNNING:0 [style=bold]
+        RUNNING:1 -> RELEASE [style=bold]
+        RUNNING:3 -> STOP
+        RUNNING:2 -> STOP
+        STOP -> RELEASE
+        RELEASE -> REMOVE [style=bold]
+        REMOVE -> COMPETE:0 [style=bold]
+
+        SLEEP [style=bold]
+        RUNNING [style=bold]
+
+        ANY -> FAILED:0 [style=dashed]
+        FAILED:1 -> DISCOVER:0
+        ANY [label="any\nstate",shape=circle,style=dashed]
+        FAILED [label="<0>FAILED |
+                <1>after\nexponential\nbackoff"]
+}
