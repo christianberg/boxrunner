@@ -3,5 +3,9 @@ package main
 import "github.com/christianberg/boxrunner/boxrunner"
 
 func main() {
-	boxrunner.Run("foo", nil)
+	runner, err := boxrunner.NewBoxRunner("foo",nil)
+	if err != nil {
+		panic("Could not create BoxRunner: " + err.Error())
+	}
+	runner.Run()
 }
