@@ -213,11 +213,11 @@ func (b *BoxRunner) Run() (success bool, error error) {
 
 	machine.AddState("RUNNING", func() string {
 		lock_watch := make(chan string)
-		cancel := make(chan bool, 1)
+		cancel_lock_watch := make(chan bool, 1)
 		go func() {
 			err := b.waitForLockChange(func(s string) bool { return s != b.lock.Session })
 			select {
-			case <-cancel:
+			case <-cancel_lock_watch:
 				return
 			default:
 				if err != nil {
@@ -229,13 +229,36 @@ func (b *BoxRunner) Run() (success bool, error error) {
 			}
 		}()
 
+		container_watch := make(chan string)
+		cancel_container_watch := make(chan bool, 1)
+		go func() {
+			exit_code, err := b.dock.WaitContainer(b.ID)
+			select {
+			case <-cancel_container_watch:
+				return
+			default:
+				if err != nil {
+					b.logger.Printf("ERROR: Waiting for Docker container exit failed: %v", err)
+					container_watch <- "FAILED"
+					return
+				}
+				level := "INFO"
+				if exit_code > 0 {
+					level = "WARN"
+				}
+				b.logger.Printf("%v: Docker container exited with code %v\n", level, exit_code)
+				container_watch <- "RELEASE"
+				return
+			}
+		}()
 
 		select {
 		case s := <-lock_watch:
+			cancel_container_watch <- true
 			return s
-		case <-time.After(20 * time.Second):
-			cancel <- true
-			return "STOP"
+		case s := <-container_watch:
+			cancel_lock_watch <- true
+			return s
 		}
 	})
 
