@@ -10,6 +10,8 @@ type Handler func() string
 type Machine struct {
 	Handlers map[string]Handler
 	Logger   *log.Logger
+	StateLog chan string
+	Ticker   chan bool
 }
 
 type StateMachineError struct {
@@ -39,14 +41,26 @@ func (machine Machine) Run() (success bool, error error) {
 			oldstate := state
 			state = handler()
 			machine.Logger.Printf("INFO: State transition: %s -> %s\n", oldstate, state)
+			if machine.StateLog != nil {
+				machine.StateLog <- state
+			}
 			if state == "END" {
 				machine.Logger.Println("INFO: Terminating")
+				if machine.StateLog != nil {
+					close(machine.StateLog)
+				}
 				return true, nil
 			}
 		} else {
 			err := StateMachineError{state}
 			machine.Logger.Print(err)
+			if machine.StateLog != nil {
+				close(machine.StateLog)
+			}
 			return false, err
+		}
+		if machine.Ticker != nil {
+			<-machine.Ticker
 		}
 	}
 }
