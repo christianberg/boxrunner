@@ -56,7 +56,7 @@ func TestTickerAllowsToSyncStateMachine(t *testing.T) {
 	m.StateLog = log
 	go m.Run()
 
-	if s:= <-log; s != "FOO" {
+	if s := <-log; s != "FOO" {
 		t.Errorf("Expected first state to be FOO, was %v", s)
 	}
 	select {
@@ -65,7 +65,7 @@ func TestTickerAllowsToSyncStateMachine(t *testing.T) {
 	default:
 		ticker <- true
 	}
-	if s:= <-log; s != "END" {
+	if s := <-log; s != "END" {
 		t.Errorf("Expected state after tick to be END, was %v", s)
 	}
 }
