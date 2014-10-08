@@ -13,13 +13,15 @@ import (
 )
 
 type BoxRunner struct {
-	Service string
-	ID      string
-	port    string
-	consul  *consulapi.Client
-	logger  *log.Logger
-	dock    *docker.Client
-	lock    *consulapi.KVPair
+	Service  string
+	ID       string
+	port     string
+	consul   *consulapi.Client
+	logger   *log.Logger
+	dock     *docker.Client
+	lock     *consulapi.KVPair
+	failwait time.Duration
+	lastfail time.Time
 }
 
 type BoxRunnerOptions struct {
@@ -66,6 +68,7 @@ func NewBoxRunner(service_name string, options *BoxRunnerOptions) (runner *BoxRu
 			Key:   service_name,
 			Value: []byte(runner_id),
 		},
+		failwait: 1 * time.Second,
 	}
 	return
 }
@@ -292,6 +295,20 @@ func (b *BoxRunner) Run() (success bool, error error) {
 			return "FAILED"
 		}
 		return "COMPETE"
+	})
+
+	machine.AddState("FAILED", func() string {
+		if b.lastfail.Add(2 * b.failwait).Before(time.Now()) {
+			b.failwait = 1 * time.Second
+		}
+		b.lastfail = time.Now()
+		b.logger.Printf("WARN: Waiting for %v", b.failwait)
+		time.Sleep(b.failwait)
+		b.failwait = 2 * b.failwait
+		if b.failwait > 5*time.Minute {
+			b.failwait = 5 * time.Minute
+		}
+		return "DISCOVER"
 	})
 
 	return machine.Run()
