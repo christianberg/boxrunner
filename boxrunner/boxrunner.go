@@ -132,7 +132,7 @@ func (b *BoxRunner) Run() (success bool, error error) {
 		io.WriteString(w, "OK")
 	})
 
-	go http.ListenAndServe(":"+b.port, nil)
+	go http.ListenAndServe("127.0.0.1:"+b.port, nil)
 
 	machine := &statemachine.Machine{
 		Handlers: map[string]statemachine.Handler{},
