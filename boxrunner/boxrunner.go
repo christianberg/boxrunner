@@ -140,6 +140,10 @@ func (b *BoxRunner) Run() (success bool, error error) {
 	}
 
 	machine.AddState("INIT", func() string {
+		return "DISCOVER"
+	})
+
+	machine.AddState("DISCOVER", func() string {
 		session_id, err := b.findOrCreateSession()
 		if err != nil {
 			return "FAILED"
@@ -150,10 +154,6 @@ func (b *BoxRunner) Run() (success bool, error error) {
 			b.logger.Printf("ERROR: Cannot ping docker server: %v", err)
 			return "FAILED"
 		}
-		return "DISCOVER"
-	})
-
-	machine.AddState("DISCOVER", func() string {
 		return "COMPETE"
 	})
 
