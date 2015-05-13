@@ -73,7 +73,7 @@ func NewBoxRunner(service_name string, options *BoxRunnerOptions) (runner *BoxRu
 	return
 }
 
-func (b *BoxRunner) findOrCreateCheck() (error) {
+func (b *BoxRunner) findOrCreateCheck() error {
 	checks, err := b.consul.Agent().Checks()
 	if err != nil {
 		b.logger.Printf("Could not list existing checks: %v", err)
