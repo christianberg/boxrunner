@@ -34,6 +34,16 @@ var DefaultOptions = &BoxRunnerOptions{
 	ConsulAddress: "localhost:8500",
 }
 
+func createDockerClient() (*docker.Client, error) {
+	endpoint := os.Getenv("DOCKER_HOST")
+	path := os.Getenv("DOCKER_CERT_PATH")
+	ca := fmt.Sprintf("%s/ca.pem", path)
+	cert := fmt.Sprintf("%s/cert.pem", path)
+	key := fmt.Sprintf("%s/key.pem", path)
+	client, err := docker.NewTLSClient(endpoint, cert, key, ca)
+	return client, err
+}
+
 func NewBoxRunner(service_name string, options *BoxRunnerOptions) (runner *BoxRunner, err error) {
 	if options == nil {
 		options = DefaultOptions
@@ -41,7 +51,7 @@ func NewBoxRunner(service_name string, options *BoxRunnerOptions) (runner *BoxRu
 	completeOptions(options)
 
 	logger := options.Logger
-	dock, err := docker.NewClient("tcp://0.0.0.0:2375")
+	dock, err := createDockerClient()
 	if err != nil {
 		logger.Printf("Could not initialize Docker client: %s", err)
 		return
