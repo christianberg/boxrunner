@@ -2,9 +2,9 @@ package boxrunner
 
 import (
 	"fmt"
-	"github.com/armon/consul-api"
 	"github.com/christianberg/boxrunner/statemachine"
 	"github.com/fsouza/go-dockerclient"
+	"github.com/hashicorp/consul/api"
 	"io"
 	"log"
 	"net/http"
@@ -16,17 +16,17 @@ type BoxRunner struct {
 	Service  string
 	ID       string
 	port     string
-	consul   *consulapi.Client
+	consul   *api.Client
 	logger   *log.Logger
 	dock     *docker.Client
-	lock     *consulapi.KVPair
+	lock     *api.KVPair
 	failwait time.Duration
 	lastfail time.Time
 }
 
 type BoxRunnerOptions struct {
 	ConsulAddress string
-	ConsulClient  *consulapi.Client
+	ConsulClient  *api.Client
 	Logger        *log.Logger
 }
 
@@ -64,13 +64,40 @@ func NewBoxRunner(service_name string, options *BoxRunnerOptions) (runner *BoxRu
 		logger:  options.Logger,
 		dock:    dock,
 		port:    port,
-		lock: &consulapi.KVPair{
+		lock: &api.KVPair{
 			Key:   service_name,
 			Value: []byte(runner_id),
 		},
 		failwait: 1 * time.Second,
 	}
 	return
+}
+
+func (b *BoxRunner) findOrCreateCheck() (error) {
+	checks, err := b.consul.Agent().Checks()
+	if err != nil {
+		b.logger.Printf("Could not list existing checks: %v", err)
+		return err
+	}
+	for _, check := range checks {
+		if check.CheckID == b.ID {
+			b.logger.Printf("Found existing check: %v\n", check.CheckID)
+			return nil
+		}
+	}
+
+	err = b.consul.Agent().CheckRegister(&api.AgentCheckRegistration{
+		Name: b.ID,
+		ID:   b.ID,
+		AgentServiceCheck: api.AgentServiceCheck{
+			HTTP:     fmt.Sprintf("http://localhost:%v/health", b.port),
+			Interval: "5s",
+		},
+	})
+	if err != nil {
+		b.logger.Printf("ERROR: Could not register boxrunner healthcheck: %v", err)
+	}
+	return err
 }
 
 func (b *BoxRunner) findOrCreateSession() (string, error) {
@@ -86,19 +113,9 @@ func (b *BoxRunner) findOrCreateSession() (string, error) {
 		}
 	}
 
-	err = b.consul.Agent().CheckRegister(&consulapi.AgentCheckRegistration{
-		Name: b.ID,
-		AgentServiceCheck: consulapi.AgentServiceCheck{
-			Script:   fmt.Sprintf("curl -sf http://localhost:%v/health", b.port),
-			Interval: "5s",
-		},
-	})
-	if err != nil {
-		b.logger.Printf("ERROR: Could not register boxrunner healthcheck: %v", err)
-		return "", err
-	}
+	b.findOrCreateCheck()
 
-	session_entry := &consulapi.SessionEntry{
+	session_entry := &api.SessionEntry{
 		Name:      b.ID,
 		LockDelay: 5 * time.Second,
 		Checks:    []string{"serfHealth", b.ID},
@@ -113,7 +130,7 @@ func (b *BoxRunner) findOrCreateSession() (string, error) {
 }
 
 func (b *BoxRunner) waitForLockChange(predicate func(string) bool) (err error) {
-	query_options := &consulapi.QueryOptions{
+	query_options := &api.QueryOptions{
 		WaitIndex: 0,
 	}
 	for {
@@ -320,10 +337,7 @@ func completeOptions(options *BoxRunnerOptions) {
 			options.ConsulAddress = DefaultOptions.ConsulAddress
 		}
 		var err error
-		// options.ConsulClient, err = consulapi.NewClient(&consulapi.Config{
-		// 	Address: options.ConsulAddress,
-		// })
-		options.ConsulClient, err = consulapi.NewClient(consulapi.DefaultConfig())
+		options.ConsulClient, err = api.NewClient(api.DefaultConfig())
 		if err != nil {
 			panic("Failed to create consul-api Client")
 		}
